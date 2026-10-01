@@ -1,0 +1,58 @@
+# Power Bank Software Configuration
+# ESP32 Pin Configuration and Settings
+#
+# This file acts like a central settings file for the project. Instead of hard-coding
+# numbers across multiple modules, we keep everything in one place so the code is easy
+# to adjust when you change the hardware layout.
+#
+# Why this matters:
+# - GPIO pins are limited and can conflict with built-in flash/serial functions.
+# - Each component (LEDs, buttons, GPS, ADC) needs a consistent pin mapping.
+# - If the wiring changes, only this file usually needs updating.
+
+# GPIO Pins for LEDs (PWM)
+# PWM is used because we need to dim the LEDs smoothly instead of switching them fully on/off.
+# The ESP32 can generate PWM signals on many digital pins.
+LED_PINS = {
+    'led1': 25,  # GPIO25 - LED channel 1
+    'led2': 26,  # GPIO26 - LED channel 2
+    'led3': 27,  # GPIO27 - LED channel 3
+    'led4': 14,  # GPIO14 - LED channel 4
+}
+
+# ADC Pin for Potentiometer
+# The potentiometer is used as a variable resistor. By wiring it to an ADC pin,
+# the ESP32 can read different voltage levels and convert them into values from 0 to 100.
+POTENTIOMETER_PIN = 35  # GPIO35 (ADC1) - brightness control input
+
+# Button Pins
+# These are digital inputs with pull-up resistors enabled. Buttons are typically active-low,
+# meaning pressing them pulls the signal to GND, and the code interprets that as a button press.
+BUTTON_POWER = 32  # GPIO32 - turn power on/off
+BUTTON_SELECT = 33  # GPIO33 - cycle modes or change selected option
+
+# PWM Settings
+# PWM is used to simulate analog voltage control. The duty cycle defines how much time the
+# signal stays HIGH within each cycle, effectively controlling brightness.
+PWM_FREQUENCY = 1000  # 1kHz - smooth enough for LED dimming without flicker
+PWM_MAX_DUTY = 1023  # 10-bit resolution = 0 to 1023 for duty cycle
+
+# GPS Settings (UART)
+# GPS modules usually communicate over UART (serial). The ESP32 has multiple UART ports.
+# We choose UART2 for the GPS and define the pins used for transmit/receive.
+GPS_UART_NUM = 2  # UART2
+GPS_BAUDRATE = 9600  # Most cheap GPS modules such as NEO-6M use 9600 baud by default
+GPS_TX_PIN = 17  # GPIO17 - ESP32 TX pin connected to GPS RX
+GPS_RX_PIN = 16  # GPIO16 - ESP32 RX pin connected to GPS TX
+
+# Battery/Power Settings
+# Safety is important in a power bank project. Measuring the battery voltage helps detect
+# when it is getting too low and prevents damaging the battery or the LEDs.
+BAT_ADC_PIN = 34  # GPIO34 - Battery voltage sensing
+LOW_BATTERY_VOLTAGE = 3.0  # Volts (cutoff point for safety)
+
+# System Settings
+# These values affect the timing and overall power behavior of the software.
+MAX_LED_POWER = 10  # Watts per LED
+TOTAL_LED_POWER = 40  # Total LED output target in watts (4 LEDs x 10W)
+UPDATE_INTERVAL = 100  # milliseconds - main update loop delay

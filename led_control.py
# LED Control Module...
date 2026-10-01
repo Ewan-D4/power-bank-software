@@ -1,0 +1,743 @@
+# Main Power Bank Control Software
+#
+# This is the central program that ties the whole project together.
+# It manages:
+# - LED brightness
+# - button presses
+# - mode switching
+# - GPS readings
+#
+# The software uses a simple state-machine approach:
+# - manual mode: potentiometer controls brightness directly
+# - auto mode: brightness changes according to a preset pattern
+# - gps_track mode: the lights respond to satellite signal strength or GPS status
+
+import time
+import machine
+from led_control import LEDController
+from input_handler import InputHandler
+from gps_module import GPSModule
+
+
+class PowerBankController:
+    """
+    Main controller for power bank with LED lights and GPS tracking.
+
+    This class is the brain of the device. It keeps track of the current mode and calls the
+    correct behavior depending on user input and sensor readings.
+    """
+
+    def __init__(self):
+        print("\n=== Power Bank Software Initializing ===")
+
+        # Create the LED controller object.
+        self.led_controller = LEDController()
+
+        # Create GPS manager.
+        self.gps = GPSModule()
+
+        # Create the input manager with callback hooks for button actions.
+        self.input_handler = InputHandler(
+            callback_power=self.on_power_button,
+            callback_select=self.on_select_button
+        )
+
+        # Default operating mode.
+        self.mode = 'manual'  # manual, auto, gps_track
+
+        # Safety/feature flags.
+        self.is_running = True
+        self.last_gps_update = 0
+        self.gps_update_interval = 5  # seconds
+
+        print("Power Bank Controller Ready!")
+        print("Modes: 'manual' (pot control), 'auto' (button control), 'gps_track'")
+
+    def on_power_button(self):
+        """Callback for power button press."""
+        print("Power button pressed")
+
+        # Toggle system on/off.
+        self.is_running = not self.is_running
+
+        if not self.is_running:
+            self.led_controller.all_off()
+            print("Power Bank OFF")
+        else:
+            print("Power Bank ON")
+
+    def on_select_button(self):
+        """Callback for select button press; cycles the operating mode."""
+        modes = ['manual', 'auto', 'gps_track']
+        current_idx = modes.index(self.mode)
+        self.mode = modes[(current_idx + 1) % len(modes)]
+        print(f"Mode switched to: {self.mode}")
+
+        # When entering GPS mode, give the user a quick visual flash as feedback.
+        if self.mode == 'gps_track':
+            self.led_controller.pulse(duration_ms=500)
+
+    def handle_manual_mode(self):
+        """Manual brightness control via potentiometer."""
+        brightness = self.input_handler.get_potentiometer()
+        self.led_controller.set_brightness(brightness)
+        return brightness
+
+    def handle_auto_mode(self):
+        """
+        Auto mode uses a repeating brightness pattern.
+
+        This is a basic example of a preset lighting cycle. Instead of continuous dial control,
+        the system steps through brightness values at fixed intervals.
+        """
+        current = self.led_controller.get_brightness()
+
+        # Cycle through 0, 25, 50, 75, 100 in a loop.
+        new_brightness = (current + 25) % 125
+        self.led_controller.set_brightness(new_brightness)
+        return new_brightness
+
+    def handle_gps_mode(self):
+        """
+        GPS mode uses the number of satellites to scale LED brightness.
+
+        More satellites often means a stronger fix, so the lighting can respond visually to
+        GPS signal quality. This is more of an indicator than a fully practical navigation light.
+        """
+        if time.time() - self.last_gps_update > self.gps_update_interval:
+            # Try to read GPS data a few times before giving up.
+            for _ in range(10):
+                if self.gps.update():
+                    self.last_gps_update = time.time()
+                    break
+
+        # If GPS fix is valid, use satellite count to estimate signal quality.
+        if self.gps.has_fix():
+            brightness = min(100, (self.gps.satellites / 12) * 100)
+            self.led_controller.set_brightness(brightness)
+            return brightness, self.gps.get_status_string()
+        else:
+            # No fix: turn the LEDs off or leave them dim.
+            self.led_controller.all_off()
+            return 0, "Searching for GPS..."
+
+    def run(self):
+        """Main control loop."""
+        loop_count = 0
+
+        while True:
+            try:
+                # Check for button presses before doing other logic.
+                power_pressed, select_pressed = self.input_handler.check_buttons()
+
+                # If the system is off, stop everything until it's turned back on.
+                if not self.is_running:
+                    time.sleep(0.1)
+                    continue
+
+                # Mode-specific behavior.
+                if self.mode == 'manual':
+                    brightness = self.handle_manual_mode()
+                    if loop_count % 50 == 0:
+                        print(f"[Manual] Brightness: {brightness}%")
+
+                elif self.mode == 'auto':
+                    # Increment brightness only when the power button is pressed.
+                    if power_pressed:
+                        brightness = self.handle_auto_mode()
+                        print(f"[Auto] Brightness: {brightness}%")
+
+                elif self.mode == 'gps_track':
+                    result = self.handle_gps_mode()
+                    if isinstance(result, tuple):
+                        brightness, status = result
+                        if loop_count % 20 == 0:
+                            print(f"[GPS] {status}")
+
+                loop_count += 1
+                time.sleep(0.1)  # 100 ms loop delay
+
+            except KeyboardInterrupt:
+                print("\nShutting down...")
+                self.led_controller.all_off()
+                break
+
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(1)
+
+
+if __name__ == '__main__':
+    # Create the controller and start the main loop.
+    controller = PowerBankController()
+    controller.run()
+
+    # Once the loop exits, the script ends.
+    # In real hardware, this is often the last point before the ESP32 idles or sleeps.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+n
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"}]} hairt to=functions.push_files  jspb  {
